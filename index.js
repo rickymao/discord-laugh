@@ -12,6 +12,7 @@ const {
 const ytdl = require('ytdl-core');
 const { join } = require('path');
 const { createReadStream } = require('fs');
+const { token } = require('./config/config.json');
 
 const player = createAudioPlayer({
 	behaviors: {
@@ -24,7 +25,7 @@ player.on('error', error => {
 });
 
 const client = new Client({ intents: ['GUILD_VOICE_STATES', 'GUILD_MESSAGES', 'GUILDS'] });
-client.login('ODc2NzIyNTEwNzc3OTQyMDI2.YRoNdw.M35K3empYohkC16hpKo6ufGD3ps');
+client.login(token);
 
 
 client.once('ready', () => {
