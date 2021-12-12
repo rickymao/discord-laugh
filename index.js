@@ -9,7 +9,8 @@ const {
 	NoSubscriberBehavior,
 	VoiceConnectionStatus,
 	VoiceReceiver,
-	EndBehaviorType
+	EndBehaviorType,
+	getVoiceConnection
 } = require('@discordjs/voice');
 const ytdl = require('ytdl-core');
 const { join } = require('path');
@@ -33,13 +34,26 @@ const isAllUsersNotSpeaking = () => {
 
 const handleSpeakEvent = (speakerId, isSpeaking, connection) => {
 	usersSpeakingMap[speakerId] = isSpeaking;
+	console.log("------SPEAK------");
+	console.log(isLaughPlaying);
 
-	if (isAllUsersNotSpeaking() && !isLaughPlaying) {
-		let resource = createAudioResource(join(__dirname, 'test.mp3'));
-		const player = createAudioPlayer();
-		
-		player.play(resource);
-		connection.subscribe(player);
+	if (!isSpeaking) {
+		setTimeout(() => {
+			if (isAllUsersNotSpeaking() && !isLaughPlaying) {
+				const player = createAudioPlayer();
+				player.on(AudioPlayerStatus.Idle, () => {
+					isLaughPlaying = false;
+				});
+				player.on(AudioPlayerStatus.Playing, () => {
+					isLaughPlaying = true;
+				});
+				console.log("------PLAYING------");
+				
+				let resource = createAudioResource(join(__dirname, 'test.mp3'));
+				player.play(resource);
+				connection.subscribe(player);
+			}
+		}, 1500);
 	}
 
 }
@@ -60,12 +74,6 @@ const isArrayMatch = (arr1, arr2) => {
 
 	return true;
 }
-
-const player = createAudioPlayer({
-	behaviors: {
-		noSubscriber: NoSubscriberBehavior.Play,
-	},
-});
 
 const client = new Client({ intents: ['GUILD_VOICE_STATES', 'GUILD_MESSAGES', 'GUILDS'] });
 client.login(token);
@@ -107,22 +115,13 @@ client.on('interactionCreate', async interaction => {
 			newObj.id = id;
 			return newObj;
 		});
-
-		console.log({userStreams});
-		const newStreams = userStreams.map((userStream) => {
-			userStream.isTalking = false;
-			return userStream;
-		});
-		console.log({newStreams});
 		// Listen to when they start and stop
-		for (const stream of newStreams) {
+		for (const stream of userStreams) {
 			stream.on('data', (chunk) => {
 				const chunkString = JSON.stringify(chunk);
 				const chunkObj = JSON.parse(chunkString);
 				if (isArrayMatch(chunkObj.data, [248, 255, 254])) {
-					usersSpeakingMap[stream.id] = false;
 					usersSpeakingMapEmitter.emit('speak', stream.id, false, connection);
-
 				} else {
 					usersSpeakingMapEmitter.emit('speak', stream.id, true, connection);
 				}
@@ -146,15 +145,21 @@ client.on('interactionCreate', async interaction => {
 		
 		player.play(resource);
 		connection.subscribe(player);
-		
-		player.on(AudioPlayerStatus.Idle, () => connection.destroy());
-		
+				
 		player.on(AudioPlayerStatus.Playing, () => {
 			console.log('playing');
 		});
 		player.on(AudioPlayerStatus.Idle, () => {
-			console.log('Idle');
+			isLaughPlaying = false;
 		});
 
 	}
 });
+
+client.on('voiceStateUpdate', (oldState, newState) => {
+	const connection = getVoiceConnection(newState.guild.id);
+	let resource = createAudioResource(join(__dirname, 'testCheer.mp3'));
+	const player = createAudioPlayer();
+	player.play(resource);
+	connection.subscribe(player);
+})
