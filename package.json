@@ -19,6 +19,6 @@
     "libsodium-wrappers": "^0.7.9",
     "opusscript": "^0.0.8",
     "sodium": "^3.0.2",
-    "ytdl-core": "^4.9.1"
+    "ytdl-core": "^4.9.2"
   }
 }

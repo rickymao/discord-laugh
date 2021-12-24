@@ -1,3 +1,4 @@
+const { getRandomLaugh } = require('./laughs');
 const { Client, Intents } = require('discord.js');
 const {
 	AudioPlayerStatus,
@@ -16,12 +17,20 @@ const ytdl = require('ytdl-core');
 const { join } = require('path');
 const { createReadStream } = require('fs');
 const { token } = require('./config/config.json');
-
 const { EventEmitter } = require('events');
+const { getLaughResource } = require('./utilities/utilities');
+
 const usersSpeakingMap = {};
+let laughQueue = [];
 let isLaughPlaying = false;
 const usersSpeakingMapEmitter = new EventEmitter();
 
+
+const clearLaughQueue = () => {
+	for (const laughID of laughQueue) {
+		clearTimeout(laughID);
+	}
+}
 const isAllUsersNotSpeaking = () => {
 	const values = Object.values(usersSpeakingMap);
 	for (const value of values) {
@@ -34,11 +43,8 @@ const isAllUsersNotSpeaking = () => {
 
 const handleSpeakEvent = (speakerId, isSpeaking, connection) => {
 	usersSpeakingMap[speakerId] = isSpeaking;
-	console.log("------SPEAK------");
-	console.log(isLaughPlaying);
-
 	if (!isSpeaking) {
-		setTimeout(() => {
+		laughQueue.push(setTimeout(() => {
 			if (isAllUsersNotSpeaking() && !isLaughPlaying) {
 				const player = createAudioPlayer();
 				player.on(AudioPlayerStatus.Idle, () => {
@@ -46,14 +52,14 @@ const handleSpeakEvent = (speakerId, isSpeaking, connection) => {
 				});
 				player.on(AudioPlayerStatus.Playing, () => {
 					isLaughPlaying = true;
-				});
-				console.log("------PLAYING------");
-				
-				let resource = createAudioResource(join(__dirname, 'test.mp3'));
+				});				
+				let resource = getLaughResource(getRandomLaugh());
 				player.play(resource);
 				connection.subscribe(player);
 			}
-		}, 1500);
+		}, 750));
+	} else {
+		clearLaughQueue();
 	}
 
 }
@@ -140,7 +146,8 @@ client.on('interactionCreate', async interaction => {
 		connection.on(VoiceConnectionStatus.Ready, () => {
 			console.log('The connection has entered the Ready state - ready to play audio!');
 		});
-		let resource = createAudioResource(join(__dirname, 'test.mp3'));
+		const stream = ytdl('https://www.youtube.com/watch?v=5OSrxVXI8wo', { filter: 'audioonly' });
+		const resource = createAudioResource(stream, { inputType: StreamType.Arbitrary });
 		const player = createAudioPlayer();
 		
 		player.play(resource);
@@ -157,9 +164,9 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.on('voiceStateUpdate', (oldState, newState) => {
-	const connection = getVoiceConnection(newState.guild.id);
-	let resource = createAudioResource(join(__dirname, 'testCheer.mp3'));
-	const player = createAudioPlayer();
-	player.play(resource);
-	connection.subscribe(player);
+	// const connection = getVoiceConnection(newState.guild.id);
+	// let resource = createAudioResource(join(__dirname, 'testCheer.mp3'));
+	// const player = createAudioPlayer();
+	// player.play(resource);
+	// connection.subscribe(player);
 })
