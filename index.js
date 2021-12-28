@@ -1,4 +1,6 @@
-const { getRandomLaugh } = require('./laughs');
+const { getRandomLaugh, getLaughResource } = require('./laughs');
+const { getRandomCheer, getCheerResource } = require('./cheers');
+const { getRandomBoo, getBooResource } = require('./boos');
 const { Client, Intents } = require('discord.js');
 const {
 	AudioPlayerStatus,
@@ -16,14 +18,17 @@ const {
 const ytdl = require('ytdl-core');
 const { join } = require('path');
 const { createReadStream } = require('fs');
-const { token } = require('./config/config.json');
+const { token, clientId } = require('./config/config.json');
 const { EventEmitter } = require('events');
-const { getLaughResource } = require('./utilities/utilities');
 
 const usersSpeakingMap = {};
 let laughQueue = [];
 let isLaughPlaying = false;
+let isCheeringPlaying = false;
+let isBooingPlaying = false;
 const usersSpeakingMapEmitter = new EventEmitter();
+let currentChannelID = null;
+let currentBotID
 
 
 const clearLaughQueue = () => {
@@ -50,6 +55,11 @@ const handleSpeakEvent = (speakerId, isSpeaking, connection) => {
 				player.on(AudioPlayerStatus.Idle, () => {
 					isLaughPlaying = false;
 				});
+
+				player.on(AudioPlayerStatus.AutoPaused, () => {
+					isLaughPlaying = false;
+				});
+
 				player.on(AudioPlayerStatus.Playing, () => {
 					isLaughPlaying = true;
 				});				
@@ -57,7 +67,7 @@ const handleSpeakEvent = (speakerId, isSpeaking, connection) => {
 				player.play(resource);
 				connection.subscribe(player);
 			}
-		}, 750));
+		}, 1000));
 	} else {
 		clearLaughQueue();
 	}
@@ -101,6 +111,7 @@ client.on('interactionCreate', async interaction => {
 
 	if (interaction.commandName === "track") {
 		const channel = interaction.member.voice.channel;
+		currentChannelID = channel.id;
 		const connection = joinVoiceChannel({
 			selfDeaf: false,
 			channelId: channel.id,
@@ -164,9 +175,40 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.on('voiceStateUpdate', (oldState, newState) => {
-	// const connection = getVoiceConnection(newState.guild.id);
-	// let resource = createAudioResource(join(__dirname, 'testCheer.mp3'));
-	// const player = createAudioPlayer();
-	// player.play(resource);
-	// connection.subscribe(player);
+	const connection = getVoiceConnection(newState.guild.id);
+	console.log({ isCheeringPlaying, isLaughPlaying, isBooingPlaying });
+	if (connection && 
+		currentChannelID && 
+		oldState.channelId !== currentChannelID &&
+		newState.channelId === currentChannelID &&
+		newState.id !== clientId) {
+		let resource = getCheerResource(getRandomCheer());
+		const player = createAudioPlayer();
+		player.play(resource);
+		console.log("CHEERING");
+		isCheeringPlaying = true;
+
+		player.on(AudioPlayerStatus.AutoPaused, () => {
+			isCheeringPlaying = false;
+		});
+		
+		connection.subscribe(player);
+		
+	} else if (connection && 
+		currentChannelID && 
+		oldState.channelId === currentChannelID &&
+		newState.channelId !== currentChannelID &&
+		newState.id !== clientId) {
+			console.log("test");
+			let resource = getBooResource(getRandomBoo());
+			const player = createAudioPlayer();
+			player.play(resource);
+			isBooingPlaying = true;
+	
+			player.on(AudioPlayerStatus.AutoPaused, () => {
+				isBooingPlaying = false;
+			});
+			
+			connection.subscribe(player);
+		}
 })

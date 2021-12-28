@@ -1,12 +1,33 @@
+const {
+	createAudioResource,
+} = require('@discordjs/voice');
+const { join } = require('path');
+
 const laughList = [
-    'https://www.youtube.com/watch?v=iYVO5bUFww0', 
-    'https://www.youtube.com/watch?v=4B06Bh3i8Ms&list=PLkNE0ct3FIjMS-bDdB2uE8DATQGg9dnrm&index=3',
-    'https://www.youtube.com/watch?v=GDREV9H4ats&list=PLkNE0ct3FIjMS-bDdB2uE8DATQGg9dnrm&index=7',
-    'https://www.youtube.com/watch?v=w0E3rEy4YPQ&list=PLkNE0ct3FIjMS-bDdB2uE8DATQGg9dnrm&index=2',
-    'https://www.youtube.com/watch?v=3LG9A7fUrPs&list=PLkNE0ct3FIjMS-bDdB2uE8DATQGg9dnrm&index=1'
+    'laugh_01.mp3',
+    'laugh_02.mp3',
+    'laugh_03.mp3',
+    'laugh_04.mp3',
+    'laugh_05.mp3',
+    'laugh_06.mp3',
+    'laugh_07.mp3',
+    'laugh_08.mp3',
+    'laugh_09.mp3',
+    'laugh_10.mp3',
+    'laugh_11.mp3',
+    'laugh_12.mp3',
+    'laugh_13.mp3',
+    'laugh_14.mp3',
+    'laugh_15.mp3',
+    'laugh_16.mp3',
 ]
 
 exports.getRandomLaugh = () => {
     const randomIdx = Math.floor(Math.random() * (laughList.length));
     return laughList[randomIdx];
+}
+
+exports.getLaughResource = (laughID) => {
+    const resource = createAudioResource(join("/Users/rickm/Desktop/discord-laugh/laughs", laughID));
+    return resource;
 }
