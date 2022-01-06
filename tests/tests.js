@@ -1,0 +1,4 @@
+exports.generateMockUserSpeakingMap = (numOfUser, numOfUserSpeaking) => {
+
+}
+
