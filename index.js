@@ -2,7 +2,7 @@ const { getRandomLaugh, getLaughResource } = require('./laughs');
 const { getRandomCheer, getCheerResource } = require('./cheers');
 const { getRandomBoo, getBooResource } = require('./boos');
 const { Client, Intents } = require('discord.js');
-const { generateMockUserSpeakingMap } = require('./tests/tests');
+const { test1, test2, test3, test4, test5, test6, test7 } = require('./tests/tests');
 const SpeechTracker = require('./SpeechTracker/SpeechTracker');
 const SoundQueue = require('./SoundQueue/SoundQueue');
 const AppState = require('./AppState/AppState');
@@ -63,11 +63,79 @@ client.on('messageCreate', (message) => {
 		const commandInfo = message.content.substring(1).split(/\s+/);
 		const command = commandInfo[0];
 
-		if (command === "test") {
+		if (command === "track") {
 			const params = commandInfo.slice(1);
 			if (params.length != 2) {
 				return;
 			}
+			const laughQueue = new SoundQueue();
+			const tracker = new SpeechTracker();
+			const appState = new AppState();
+	
+			const channel = message.member.voice.channel;
+			currentChannelID = channel.id;
+			const connection = joinVoiceChannel({
+				selfDeaf: false,
+				channelId: channel.id,
+				guildId: channel.guild.id,
+				adapterCreator: channel.guild.voiceAdapterCreator
+			});
+			const receiver = connection.receiver;
+			const speakAction = (isSpeaking) => {
+				if (!isSpeaking) {
+					laughQueue.addToQueue(setTimeout(() => {
+						if (tracker.isAllUsersNotSpeaking() && !appState.isLaughPlaying) {
+							const player = createAudioPlayer();
+							player.on(AudioPlayerStatus.Idle, () => {
+								appState.setLaughState(false);
+							});
+			
+							player.on(AudioPlayerStatus.AutoPaused, () => {
+								appState.setLaughState(false);
+							});
+			
+							player.on(AudioPlayerStatus.Playing, () => {
+								appState.setLaughState(true);
+							});				
+							let resource = getLaughResource(getRandomLaugh());
+							player.play(resource);
+							connection.subscribe(player);
+						}
+					}, 1000));
+				} else {
+					laughQueue.clearQueue();
+				}
+			}
+			// Get all user IDs in call
+			const usersInCall = Array.from(channel.members.values());
+			const userIDInCall = usersInCall.map((elem) => {
+				return elem.user.id
+			});
+			// Get array of receive streams
+			const userStreams = userIDInCall.map((id) => {
+				const newObj = receiver.subscribe(id);
+				newObj.id = id;
+				return newObj;
+			});
+			// Listen to when they start and stop
+			for (const stream of userStreams) {
+				stream.on('data', (chunk) => {
+					const chunkString = JSON.stringify(chunk);
+					const chunkObj = JSON.parse(chunkString);
+					if (isArrayMatch(chunkObj.data, [248, 255, 254])) {
+						tracker.emit('speak', stream.id, false, () => speakAction(false));
+					} else {
+						tracker.emit('speak', stream.id, true, () => speakAction(true));
+					}
+				});
+			}
+		} else if (command === "test") {
+			const params = commandInfo.slice(1);
+
+			const laughQueue = new SoundQueue();
+			const tracker = new SpeechTracker();
+			const appState = new AppState();
+	
 			const channel = message.member.voice.channel;
 			currentChannelID = channel.id;
 			const connection = joinVoiceChannel({
@@ -78,77 +146,38 @@ client.on('messageCreate', (message) => {
 			});
 			const receiver = connection.receiver;
 
-
-		}
-	}
-})
-client.on('interactionCreate', async interaction => {
-
-	if (!interaction.isCommand()) { return; }
-
-	if (interaction.commandName === "track") {
-		let laughQueue = new SoundQueue();
-		const tracker = new SpeechTracker();
-		const appState = new AppState();
-
-		const channel = interaction.member.voice.channel;
-		currentChannelID = channel.id;
-		const connection = joinVoiceChannel({
-			selfDeaf: false,
-			channelId: channel.id,
-			guildId: channel.guild.id,
-			adapterCreator: channel.guild.voiceAdapterCreator
-		});
-		const receiver = connection.receiver;
-
-		const speakAction = (isSpeaking) => {
-			if (!isSpeaking) {
-				laughQueue.addToQueue(setTimeout(() => {
-					if (tracker.isAllUsersNotSpeaking() && !appState.isLaughPlaying) {
-						const player = createAudioPlayer();
-						player.on(AudioPlayerStatus.Idle, () => {
-							appState.setLaughState(false);
-						});
-		
-						player.on(AudioPlayerStatus.AutoPaused, () => {
-							appState.setLaughState(false);
-						});
-		
-						player.on(AudioPlayerStatus.Playing, () => {
-							appState.setLaughState(true);
-						});				
-						let resource = getLaughResource(getRandomLaugh());
-						player.play(resource);
-						connection.subscribe(player);
-					}
-				}, 1000));
-			} else {
-				laughQueue.clearQueue();
-			}
-		}
-
-		// Get all user IDs in call
-		const usersInCall = Array.from(channel.members.values());
-		const userIDInCall = usersInCall.map((elem) => {
-			return elem.user.id
-		});
-		// Get array of receive streams
-		const userStreams = userIDInCall.map((id) => {
-			const newObj = receiver.subscribe(id);
-			newObj.id = id;
-			return newObj;
-		});
-		// Listen to when they start and stop
-		for (const stream of userStreams) {
-			stream.on('data', (chunk) => {
-				const chunkString = JSON.stringify(chunk);
-				const chunkObj = JSON.parse(chunkString);
-				if (isArrayMatch(chunkObj.data, [248, 255, 254])) {
- 					tracker.emit('speak', stream.id, false, () => speakAction(false));
+			const speakAction = (isSpeaking) => {
+				if (!isSpeaking) {
+					laughQueue.addToQueue(setTimeout(() => {
+						if (tracker.isAllUsersNotSpeaking() && !appState.isLaughPlaying) {
+							const player = createAudioPlayer();
+							player.on(AudioPlayerStatus.Idle, () => {
+								appState.setLaughState(false);
+							});
+			
+							player.on(AudioPlayerStatus.AutoPaused, () => {
+								appState.setLaughState(false);
+							});
+			
+							player.on(AudioPlayerStatus.Playing, () => {
+								appState.setLaughState(true);
+							});				
+							let resource = getLaughResource(getRandomLaugh());
+							player.play(resource);
+							connection.subscribe(player);
+						}
+					}, 1000));
 				} else {
-					tracker.emit('speak', stream.id, true, () => speakAction(true));
+					laughQueue.clearQueue();
 				}
-			});
+			}
+
+			test7(tracker, speakAction);
+
+
+
+		} else if (command === "help") {
+			
 		}
 	}
 });
