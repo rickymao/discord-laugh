@@ -1,30 +1,18 @@
 const { getRandomLaugh, getLaughResource } = require('./laughs');
-const { getRandomCheer, getCheerResource } = require('./cheers');
-const { getRandomBoo, getBooResource } = require('./boos');
-const { Client, Intents } = require('discord.js');
-const { test1, test2, test3, test4, test5, test6, test7 } = require('./tests/tests');
+// const { getRandomCheer, getCheerResource } = require('./cheers');
+// const { getRandomBoo, getBooResource } = require('./boos');
+const { Client } = require('discord.js');
+const { test7 } = require('./tests/tests');
 const SpeechTracker = require('./SpeechTracker/SpeechTracker');
 const SoundQueue = require('./SoundQueue/SoundQueue');
 const AppState = require('./AppState/AppState');
 const {
 	AudioPlayerStatus,
-	StreamType,
 	createAudioPlayer,
-	createAudioResource,
 	joinVoiceChannel,
-	entersState,
-	NoSubscriberBehavior,
-	VoiceConnectionStatus,
-	VoiceReceiver,
-	EndBehaviorType,
-	getVoiceConnection
 } = require('@discordjs/voice');
-const ytdl = require('ytdl-core');
-const { join } = require('path');
-const { createReadStream } = require('fs');
-const { token, clientId } = require('./config/config.json');
-const { EventEmitter } = require('events');
-
+const { MessageEmbed } = require('discord.js');
+const { token } = require('./config/config.json');
 
 const isArrayMatch = (arr1, arr2) => {
 	if (arr1.length !== arr2.length) {
@@ -38,7 +26,7 @@ const isArrayMatch = (arr1, arr2) => {
 	}
 
 	return true;
-}
+};
 
 const client = new Client({ intents: ['GUILD_VOICE_STATES', 'GUILD_MESSAGES', 'GUILDS'] });
 client.login(token);
@@ -47,7 +35,8 @@ client.login(token);
 client.once('ready', () => {
 	try {
 		console.log('Ready!');
-	} catch (e) {
+	}
+	catch (e) {
 		console.log({ e });
 	}
 
@@ -58,28 +47,23 @@ client.on('debug', console.log);
 client.on('messageCreate', (message) => {
 	if (message.content.length <= 1) { return; }
 	const prefix = message.content[0];
-	console.log(message.content);
-	if (prefix === "!") {
+	if (prefix === '!') {
 		const commandInfo = message.content.substring(1).split(/\s+/);
 		const command = commandInfo[0];
 
-		if (command === "track") {
-			const params = commandInfo.slice(1);
-			if (params.length != 2) {
-				return;
-			}
+		if (command === 'join') {
 			const laughQueue = new SoundQueue();
 			const tracker = new SpeechTracker();
 			const appState = new AppState();
-	
+
 			const channel = message.member.voice.channel;
-			currentChannelID = channel.id;
 			const connection = joinVoiceChannel({
 				selfDeaf: false,
 				channelId: channel.id,
 				guildId: channel.guild.id,
-				adapterCreator: channel.guild.voiceAdapterCreator
+				adapterCreator: channel.guild.voiceAdapterCreator,
 			});
+			appState.setCurrentChannel(channel.id);
 			const receiver = connection.receiver;
 			const speakAction = (isSpeaking) => {
 				if (!isSpeaking) {
@@ -89,27 +73,28 @@ client.on('messageCreate', (message) => {
 							player.on(AudioPlayerStatus.Idle, () => {
 								appState.setLaughState(false);
 							});
-			
+
 							player.on(AudioPlayerStatus.AutoPaused, () => {
 								appState.setLaughState(false);
 							});
-			
+
 							player.on(AudioPlayerStatus.Playing, () => {
 								appState.setLaughState(true);
-							});				
-							let resource = getLaughResource(getRandomLaugh());
+							});
+							const resource = getLaughResource(getRandomLaugh());
 							player.play(resource);
 							connection.subscribe(player);
 						}
 					}, 1000));
-				} else {
+				}
+				else {
 					laughQueue.clearQueue();
 				}
-			}
+			};
 			// Get all user IDs in call
 			const usersInCall = Array.from(channel.members.values());
 			const userIDInCall = usersInCall.map((elem) => {
-				return elem.user.id
+				return elem.user.id;
 			});
 			// Get array of receive streams
 			const userStreams = userIDInCall.map((id) => {
@@ -124,27 +109,25 @@ client.on('messageCreate', (message) => {
 					const chunkObj = JSON.parse(chunkString);
 					if (isArrayMatch(chunkObj.data, [248, 255, 254])) {
 						tracker.emit('speak', stream.id, false, () => speakAction(false));
-					} else {
+					}
+					else {
 						tracker.emit('speak', stream.id, true, () => speakAction(true));
 					}
 				});
 			}
-		} else if (command === "test") {
-			const params = commandInfo.slice(1);
-
+		}
+		else if (command === 'test') {
 			const laughQueue = new SoundQueue();
 			const tracker = new SpeechTracker();
 			const appState = new AppState();
-	
+
 			const channel = message.member.voice.channel;
-			currentChannelID = channel.id;
 			const connection = joinVoiceChannel({
 				selfDeaf: false,
 				channelId: channel.id,
 				guildId: channel.guild.id,
-				adapterCreator: channel.guild.voiceAdapterCreator
+				adapterCreator: channel.guild.voiceAdapterCreator,
 			});
-			const receiver = connection.receiver;
 
 			const speakAction = (isSpeaking) => {
 				if (!isSpeaking) {
@@ -154,38 +137,46 @@ client.on('messageCreate', (message) => {
 							player.on(AudioPlayerStatus.Idle, () => {
 								appState.setLaughState(false);
 							});
-			
+
 							player.on(AudioPlayerStatus.AutoPaused, () => {
 								appState.setLaughState(false);
 							});
-			
+
 							player.on(AudioPlayerStatus.Playing, () => {
 								appState.setLaughState(true);
-							});				
-							let resource = getLaughResource(getRandomLaugh());
+							});
+							const resource = getLaughResource(getRandomLaugh());
 							player.play(resource);
 							connection.subscribe(player);
 						}
 					}, 1000));
-				} else {
+				}
+				else {
 					laughQueue.clearQueue();
 				}
-			}
+			};
 
 			test7(tracker, speakAction);
-
-
-
-		} else if (command === "help") {
-			
 		}
+		else if (command === 'help') {
+			const exampleEmbed = new MessageEmbed()
+				.setColor('#0099ff')
+				.setTitle('Command list')
+				.setDescription('👋 Welcome! You can learn about all my commands in this cozy prompt.')
+				.addFields(
+					{ name: '!join', value: 'Joins your voice channel and automatically plays laughing, booing, and cheering sound effects.' },
+					{ name: '!leave', value: 'Leaves your voice channel.' });
+
+			message.channel.send({ embeds: [exampleEmbed] });
+		}
+
 	}
 });
 
 // client.on('voiceStateUpdate', (oldState, newState) => {
 // 	const connection = getVoiceConnection(newState.guild.id);
-// 	if (connection && 
-// 		currentChannelID && 
+// 	if (connection &&
+// 		currentChannelID &&
 // 		oldState.channelId !== currentChannelID &&
 // 		newState.channelId === currentChannelID &&
 // 		newState.id !== clientId && !isCheeringPlaying) {
@@ -202,11 +193,10 @@ client.on('messageCreate', (message) => {
 // 		player.on(AudioPlayerStatus.Idle, () => {
 // 			isCheeringPlaying = false;
 // 		});
-		
+
 // 		connection.subscribe(player);
-		
-// 	} else if (connection && 
-// 		currentChannelID && 
+// 	} else if (connection &&
+// 		currentChannelID &&
 // 		oldState.channelId === currentChannelID &&
 // 		newState.channelId !== currentChannelID &&
 // 		newState.id !== clientId) {
@@ -215,14 +205,12 @@ client.on('messageCreate', (message) => {
 // 			const player = createAudioPlayer();
 // 			player.play(resource);
 // 			isBooingPlaying = true;
-	
 // 			player.on(AudioPlayerStatus.AutoPaused, () => {
 // 				isBooingPlaying = false;
 // 			});
 // 			player.on(AudioPlayerStatus.Idle, () => {
 // 				isBooingPlaying = false;
 // 			});
-			
 // 			connection.subscribe(player);
 // 		}
 // })
