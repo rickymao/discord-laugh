@@ -1,18 +1,20 @@
 const { getRandomLaugh, getLaughResource } = require('./laughs');
-// const { getRandomCheer, getCheerResource } = require('./cheers');
-// const { getRandomBoo, getBooResource } = require('./boos');
+const { getRandomCheer, getCheerResource } = require('./cheers');
+const { getRandomBoo, getBooResource } = require('./boos');
 const { Client } = require('discord.js');
 const { test7 } = require('./tests/tests');
 const SpeechTracker = require('./SpeechTracker/SpeechTracker');
 const SoundQueue = require('./SoundQueue/SoundQueue');
-const AppState = require('./AppState/AppState');
+const BotState = require('./BotState/BotState');
 const {
 	AudioPlayerStatus,
 	createAudioPlayer,
 	joinVoiceChannel,
+	getVoiceConnection,
+	VoiceConnectionStatus,
 } = require('@discordjs/voice');
 const { MessageEmbed } = require('discord.js');
-const { token } = require('./config/config.json');
+const { token, clientId } = require('./config/config.json');
 
 const isArrayMatch = (arr1, arr2) => {
 	if (arr1.length !== arr2.length) {
@@ -52,34 +54,55 @@ client.on('messageCreate', (message) => {
 		const command = commandInfo[0];
 
 		if (command === 'join') {
+			const channel = message.member.voice.channel;
+			const botConnection = getVoiceConnection(message.member.guild.id);
+			if (!channel) {
+				const errorEmbed = new MessageEmbed()
+					.setColor('#0099ff')
+					.setTitle('❌ An error has occured!')
+					.setDescription('You are not in an available voice channel.');
+
+				message.channel.send({ embeds: [errorEmbed] });
+				return;
+			}
+			else if (botConnection &&
+			botConnection.state.status === VoiceConnectionStatus.Ready &&
+			channel.id === botConnection.joinConfig.channelId) {
+				const errorEmbed = new MessageEmbed()
+					.setColor('#0099ff')
+					.setTitle('❌ An error has occured!')
+					.setDescription('The bot is already in your voice channel.');
+
+				message.channel.send({ embeds: [errorEmbed] });
+				return;
+			}
+
 			const laughQueue = new SoundQueue();
 			const tracker = new SpeechTracker();
-			const appState = new AppState();
+			const botState = new BotState();
 
-			const channel = message.member.voice.channel;
 			const connection = joinVoiceChannel({
 				selfDeaf: false,
 				channelId: channel.id,
 				guildId: channel.guild.id,
 				adapterCreator: channel.guild.voiceAdapterCreator,
 			});
-			appState.setCurrentChannel(channel.id);
 			const receiver = connection.receiver;
 			const speakAction = (isSpeaking) => {
 				if (!isSpeaking) {
 					laughQueue.addToQueue(setTimeout(() => {
-						if (tracker.isAllUsersNotSpeaking() && !appState.isLaughPlaying) {
+						if (tracker.isAllUsersNotSpeaking() && !botState.isLaughPlaying) {
 							const player = createAudioPlayer();
 							player.on(AudioPlayerStatus.Idle, () => {
-								appState.setLaughState(false);
+								botState.setLaughState(false);
 							});
 
 							player.on(AudioPlayerStatus.AutoPaused, () => {
-								appState.setLaughState(false);
+								botState.setLaughState(false);
 							});
 
 							player.on(AudioPlayerStatus.Playing, () => {
-								appState.setLaughState(true);
+								botState.setLaughState(true);
 							});
 							const resource = getLaughResource(getRandomLaugh());
 							player.play(resource);
@@ -115,6 +138,16 @@ client.on('messageCreate', (message) => {
 					}
 				});
 			}
+
+			const joinEmbed = new MessageEmbed()
+				.setColor('#0099ff')
+				.setTitle('👏 🙌 The bot has joined your channel!')
+				.setDescription('The bot will automatically play the following:')
+				.addFields(
+					{ name: '🤣 Laughing', value: 'When there is an awkward silence between conversations' },
+					{ name: '📣 Cheering', value: 'When users join the call' },
+					{ name: '👎 Booing', value: 'When users leave the call' });
+			message.channel.send({ embeds: [joinEmbed] });
 		}
 		else if (command === 'test') {
 			const laughQueue = new SoundQueue();
@@ -169,48 +202,65 @@ client.on('messageCreate', (message) => {
 
 			message.channel.send({ embeds: [exampleEmbed] });
 		}
+		else if (command === 'leave') {
+			const connection = getVoiceConnection(message.member.voice.channel.guild.id);
+			if (!connection) {
+				const errorEmbed = new MessageEmbed()
+					.setColor('#0099ff')
+					.setTitle('❌ An error has occured!')
+					.setDescription('The bot is currently not connected to any voice channels.');
 
+				message.channel.send({ embeds: [errorEmbed] });
+				return;
+			}
+
+			const userVoiceChannel = message.member.voice.channel;
+			if (userVoiceChannel.id !== connection.joinConfig.channelId) {
+				const errorEmbed = new MessageEmbed()
+					.setColor('#0099ff')
+					.setTitle('❌ An error has occured!')
+					.setDescription('You must be in the same voice channel as the bot.');
+
+				message.channel.send({ embeds: [errorEmbed] });
+				return;
+			}
+
+			connection.disconnect();
+			connection.destroy();
+			const leaveEmbed = new MessageEmbed()
+				.setColor('#0099ff')
+				.setTitle('🏃 The bot has left your channel!');
+
+			message.channel.send({ embeds: [leaveEmbed] });
+			return;
+		}
 	}
 });
 
-// client.on('voiceStateUpdate', (oldState, newState) => {
-// 	const connection = getVoiceConnection(newState.guild.id);
-// 	if (connection &&
-// 		currentChannelID &&
-// 		oldState.channelId !== currentChannelID &&
-// 		newState.channelId === currentChannelID &&
-// 		newState.id !== clientId && !isCheeringPlaying) {
-// 		let resource = getCheerResource(getRandomCheer());
-// 		const player = createAudioPlayer();
-// 		player.play(resource);
-// 		console.log("CHEERING");
-// 		isCheeringPlaying = true;
+client.on('voiceStateUpdate', (oldState, newState) => {
+	const connection = getVoiceConnection(newState.guild.id);
+	if (!connection) { return; }
 
-// 		player.on(AudioPlayerStatus.AutoPaused, () => {
-// 			isCheeringPlaying = false;
-// 		});
-
-// 		player.on(AudioPlayerStatus.Idle, () => {
-// 			isCheeringPlaying = false;
-// 		});
-
-// 		connection.subscribe(player);
-// 	} else if (connection &&
-// 		currentChannelID &&
-// 		oldState.channelId === currentChannelID &&
-// 		newState.channelId !== currentChannelID &&
-// 		newState.id !== clientId) {
-// 			console.log("test");
-// 			let resource = getBooResource(getRandomBoo());
-// 			const player = createAudioPlayer();
-// 			player.play(resource);
-// 			isBooingPlaying = true;
-// 			player.on(AudioPlayerStatus.AutoPaused, () => {
-// 				isBooingPlaying = false;
-// 			});
-// 			player.on(AudioPlayerStatus.Idle, () => {
-// 				isBooingPlaying = false;
-// 			});
-// 			connection.subscribe(player);
-// 		}
-// })
+	const currentChannelID = connection.joinConfig.channelId;
+	const userID = newState.id;
+	if (connection &&
+		currentChannelID &&
+		oldState.channelId !== currentChannelID &&
+		newState.channelId === currentChannelID &&
+		userID !== clientId) {
+		const resource = getCheerResource(getRandomCheer());
+		const player = createAudioPlayer();
+		player.play(resource);
+		connection.subscribe(player);
+	}
+	else if (connection &&
+		currentChannelID &&
+		oldState.channelId === currentChannelID &&
+		newState.channelId !== currentChannelID &&
+		userID !== clientId) {
+		const resource = getBooResource(getRandomBoo());
+		const player = createAudioPlayer();
+		player.play(resource);
+		connection.subscribe(player);
+	}
+});

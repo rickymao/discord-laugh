@@ -5,7 +5,7 @@ const { clientId, guildId, token } = require('./config/config.json');
 
 const commands = [
 	new SlashCommandBuilder().setName('track').setDescription('Track voices'),
-    new SlashCommandBuilder().setName('laugh').setDescription('Joins your call to play a laugh track')
+	new SlashCommandBuilder().setName('laugh').setDescription('Joins your call to play a laugh track'),
 ].map(command => command.toJSON());
 
 const rest = new REST({ version: '9' }).setToken(token);
@@ -18,7 +18,8 @@ const rest = new REST({ version: '9' }).setToken(token);
 		);
 
 		console.log('Successfully registered application commands.');
-	} catch (error) {
+	}
+	catch (error) {
 		console.error(error);
 	}
 })();
