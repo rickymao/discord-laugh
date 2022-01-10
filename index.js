@@ -2,7 +2,7 @@ const { getRandomLaugh, getLaughResource } = require('./laughs');
 const { getRandomCheer, getCheerResource } = require('./cheers');
 const { getRandomBoo, getBooResource } = require('./boos');
 const { Client } = require('discord.js');
-const { test7 } = require('./tests/tests');
+// const { test7 } = require('./tests/tests');
 const SpeechTracker = require('./SpeechTracker/SpeechTracker');
 const SoundQueue = require('./SoundQueue/SoundQueue');
 const BotState = require('./BotState/BotState');
@@ -15,6 +15,7 @@ const {
 } = require('@discordjs/voice');
 const { MessageEmbed } = require('discord.js');
 const { token, clientId } = require('./config/config.json');
+const BotTracker = require('./BotTracker/BotTracker');
 
 const isArrayMatch = (arr1, arr2) => {
 	if (arr1.length !== arr2.length) {
@@ -31,6 +32,7 @@ const isArrayMatch = (arr1, arr2) => {
 };
 
 const client = new Client({ intents: ['GUILD_VOICE_STATES', 'GUILD_MESSAGES', 'GUILDS'] });
+const botTracker = new BotTracker();
 client.login(token);
 
 
@@ -79,7 +81,10 @@ client.on('messageCreate', (message) => {
 
 			const laughQueue = new SoundQueue();
 			const tracker = new SpeechTracker();
-			const botState = new BotState();
+			const botState = botTracker.getState(channel.guildId) || new BotState();
+			if (!botTracker.getState(channel.guildId)) {
+				botTracker.addToTracker(channel.guildId, botState);
+			}
 
 			const connection = joinVoiceChannel({
 				selfDeaf: false,
@@ -150,46 +155,46 @@ client.on('messageCreate', (message) => {
 			message.channel.send({ embeds: [joinEmbed] });
 		}
 		else if (command === 'test') {
-			const laughQueue = new SoundQueue();
-			const tracker = new SpeechTracker();
-			const appState = new AppState();
+			// const laughQueue = new SoundQueue();
+			// const tracker = new SpeechTracker();
+			// const appState = new BotState();
 
-			const channel = message.member.voice.channel;
-			const connection = joinVoiceChannel({
-				selfDeaf: false,
-				channelId: channel.id,
-				guildId: channel.guild.id,
-				adapterCreator: channel.guild.voiceAdapterCreator,
-			});
+			// const channel = message.member.voice.channel;
+			// const connection = joinVoiceChannel({
+			// 	selfDeaf: false,
+			// 	channelId: channel.id,
+			// 	guildId: channel.guild.id,
+			// 	adapterCreator: channel.guild.voiceAdapterCreator,
+			// });
 
-			const speakAction = (isSpeaking) => {
-				if (!isSpeaking) {
-					laughQueue.addToQueue(setTimeout(() => {
-						if (tracker.isAllUsersNotSpeaking() && !appState.isLaughPlaying) {
-							const player = createAudioPlayer();
-							player.on(AudioPlayerStatus.Idle, () => {
-								appState.setLaughState(false);
-							});
+			// const speakAction = (isSpeaking) => {
+			// 	if (!isSpeaking) {
+			// 		laughQueue.addToQueue(setTimeout(() => {
+			// 			if (tracker.isAllUsersNotSpeaking() && !appState.isLaughPlaying) {
+			// 				const player = createAudioPlayer();
+			// 				player.on(AudioPlayerStatus.Idle, () => {
+			// 					appState.setLaughState(false);
+			// 				});
 
-							player.on(AudioPlayerStatus.AutoPaused, () => {
-								appState.setLaughState(false);
-							});
+			// 				player.on(AudioPlayerStatus.AutoPaused, () => {
+			// 					appState.setLaughState(false);
+			// 				});
 
-							player.on(AudioPlayerStatus.Playing, () => {
-								appState.setLaughState(true);
-							});
-							const resource = getLaughResource(getRandomLaugh());
-							player.play(resource);
-							connection.subscribe(player);
-						}
-					}, 1000));
-				}
-				else {
-					laughQueue.clearQueue();
-				}
-			};
+			// 				player.on(AudioPlayerStatus.Playing, () => {
+			// 					appState.setLaughState(true);
+			// 				});
+			// 				const resource = getLaughResource(getRandomLaugh());
+			// 				player.play(resource);
+			// 				connection.subscribe(player);
+			// 			}
+			// 		}, 1000));
+			// 	}
+			// 	else {
+			// 		laughQueue.clearQueue();
+			// 	}
+			// };
 
-			test7(tracker, speakAction);
+			// test7(tracker, speakAction);
 		}
 		else if (command === 'help') {
 			const exampleEmbed = new MessageEmbed()
@@ -240,6 +245,8 @@ client.on('messageCreate', (message) => {
 client.on('voiceStateUpdate', (oldState, newState) => {
 	const connection = getVoiceConnection(newState.guild.id);
 	if (!connection) { return; }
+	const currentBotState = botTracker.getState(newState.guild.id);
+	if (!currentBotState) { return; }
 
 	const currentChannelID = connection.joinConfig.channelId;
 	const userID = newState.id;
@@ -247,20 +254,44 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 		currentChannelID &&
 		oldState.channelId !== currentChannelID &&
 		newState.channelId === currentChannelID &&
-		userID !== clientId) {
+		userID !== clientId && !currentBotState.isCheeringPlaying) {
 		const resource = getCheerResource(getRandomCheer());
 		const player = createAudioPlayer();
 		player.play(resource);
+		currentBotState.setCheerState(true);
+
+		player.on(AudioPlayerStatus.AutoPaused, () => {
+			currentBotState.setCheerState(false);
+		});
+		player.on(AudioPlayerStatus.AutoPaused, () => {
+			currentBotState.setCheerState(false);
+		});
+		player.on(AudioPlayerStatus.Idle, () => {
+			currentBotState.setCheerState(false);
+		});
+
 		connection.subscribe(player);
 	}
 	else if (connection &&
 		currentChannelID &&
 		oldState.channelId === currentChannelID &&
 		newState.channelId !== currentChannelID &&
-		userID !== clientId) {
+		userID !== clientId && !currentBotState.isBooingPlaying) {
 		const resource = getBooResource(getRandomBoo());
 		const player = createAudioPlayer();
 		player.play(resource);
+		currentBotState.setBooState(true);
+
+		player.on(AudioPlayerStatus.AutoPaused, () => {
+			currentBotState.setBooState(false);
+		});
+		player.on(AudioPlayerStatus.AutoPaused, () => {
+			currentBotState.setBooState(false);
+		});
+		player.on(AudioPlayerStatus.Idle, () => {
+			currentBotState.setBooState(false);
+		});
+
 		connection.subscribe(player);
 	}
 });
