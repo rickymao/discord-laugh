@@ -31,6 +31,35 @@ const isArrayMatch = (arr1, arr2) => {
 	return true;
 };
 
+const listenForLaughs = (channel, receiver) => {
+	// Get all user IDs in call
+	const usersInCall = Array.from(channel.members.values());
+	const userIDInCall = usersInCall.map((elem) => {
+		return elem.user.id;
+	});
+	// Get array of receive streams
+	const userStreams = userIDInCall.map((id) => {
+		const newObj = receiver.subscribe(id);
+		newObj.id = id;
+		return newObj;
+	});
+
+	// Listen to when they start and stop
+	for (const stream of userStreams) {
+		stream.on('data', (chunk) => {
+			const chunkString = JSON.stringify(chunk);
+			const chunkObj = JSON.parse(chunkString);
+			if (isArrayMatch(chunkObj.data, [248, 255, 254])) {
+				tracker.emit('speak', stream.id, false, () => speakAction(false));
+			}
+			else {
+				tracker.emit('speak', stream.id, true, () => speakAction(true));
+			}
+		});
+	}
+
+};
+
 const client = new Client({ intents: ['GUILD_VOICE_STATES', 'GUILD_MESSAGES', 'GUILDS'] });
 const botTracker = new BotTracker();
 client.login(token);
@@ -58,11 +87,11 @@ client.on('messageCreate', (message) => {
 		if (command === 'join') {
 			const channel = message.member.voice.channel;
 			const botConnection = getVoiceConnection(message.member.guild.id);
-			if (!channel) {
+			if (!channel || !channel.joinable) {
 				const errorEmbed = new MessageEmbed()
 					.setColor('#0099ff')
 					.setTitle('❌ An error has occured!')
-					.setDescription('You are not in an available voice channel.');
+					.setDescription('You are not in a joinable voice channel.');
 
 				message.channel.send({ embeds: [errorEmbed] });
 				return;
@@ -280,7 +309,6 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 		const resource = getBooResource(getRandomBoo());
 		const player = createAudioPlayer();
 		player.play(resource);
-		currentBotState.setBooState(true);
 
 		player.on(AudioPlayerStatus.AutoPaused, () => {
 			currentBotState.setBooState(false);
@@ -293,5 +321,10 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 		});
 
 		connection.subscribe(player);
+	}
+
+	// TODO: generate new user map when bot swaps to diff channel
+	if (userID === clientId && newState.channelId !== currentChannelID) {
+		
 	}
 });
